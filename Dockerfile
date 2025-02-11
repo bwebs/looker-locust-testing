@@ -11,4 +11,4 @@ COPY locustfile.py ./
 RUN uv sync --frozen
 
 # Set the entrypoint to run Locust
-ENTRYPOINT ["uv", "run", "locust", "-f", "locustfile.py", "--headless", "--users", "1000", "--spawn-rate", "1", "--host", "https://localhost:8080", "--run-time", "5m"] 
+ENTRYPOINT ["uv", "run", "locust", "-f", "locustfile.py", "--headless", "--users", "1000", "--spawn-rate", "10", "--host", "https://localhost:8080", "--run-time", "5m"] 
