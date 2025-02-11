@@ -10,7 +10,5 @@ COPY pyproject.toml uv.lock ./
 COPY locustfile.py ./
 RUN uv sync --frozen
 
-EXPOSE 8080
-
 # Set the entrypoint to run Locust
-ENTRYPOINT ["uv", "run", "locust", "-f", "locustfile.py", "--headless", "--users", "1000", "--spawn-rate", "1", "--host", "https://localhost:8080"] 
+ENTRYPOINT ["uv", "run", "locust", "-f", "locustfile.py", "--headless", "--users", "1000", "--spawn-rate", "1", "--host", "https://localhost:8080", "--run-time", "5m"] 
