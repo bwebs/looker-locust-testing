@@ -122,7 +122,7 @@ def load_test(
     ] = 25,
     spawn_rate: Annotated[
         float,
-        typer.Option(help="Number of users to spawn per second", min=1, max=100),
+        typer.Option(help="Number of users to spawn per second", min=0, max=100),
     ] = 1,
     run_time: Annotated[
         int,
