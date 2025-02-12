@@ -7,8 +7,6 @@ WORKDIR /app
 
 # Copy dependency files
 COPY pyproject.toml uv.lock ./
-COPY locustfile.py ./
-RUN uv sync --frozen
-
-# Set the entrypoint to run Locust
-ENTRYPOINT ["uv", "run", "locust", "-f", "locustfile.py", "--headless", "--users", "1000", "--spawn-rate", "10", "--host", "https://localhost:8080", "--run-time", "5m"] 
+COPY lkr ./lkr
+ENV UV_PROJECT_ENVIRONMENT="/usr/local/"
+RUN uv sync --frozen --no-dev
