@@ -43,6 +43,8 @@ class DashboardUser(User):
 
         sso_url = self.sdk.create_sso_embed_url(
             models40.EmbedSsoParams(
+                first_name="Embed",
+                last_name=self.user_id,
                 external_user_id=self.user_id,
                 session_length=MAX_SESSION_LENGTH,  # max seconds
                 target_url=f"{os.environ.get('LOOKERSDK_BASE_URL')}/embed/dashboards/{self.dashboard}",
