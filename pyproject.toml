@@ -20,6 +20,11 @@ package = true
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
+[dependency-groups]
+dev = [
+    "pytest>=8.3.4",
+]
+
 
 [project.scripts]
 lkr = "lkr.main:app"

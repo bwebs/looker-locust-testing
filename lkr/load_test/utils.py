@@ -1,5 +1,6 @@
 import random
-from typing import List
+import re
+from typing import Dict, List, Tuple
 
 import typer
 
@@ -18,14 +19,49 @@ def get_user_id() -> str:
     return "embed-" + str(random.randint(1000000000, 9999999999))
 
 
-def format_attributes(attributes: List[str] = []) -> List[List[str]]:
-    formatted_attributes: List[List[str]] = []
+def invalid_attribute_format(attr: str) -> bool:
+    return typer.echo(f"Invalid attribute: {attr}")
+
+
+def check_random_int_format(val: str) -> Tuple[bool, str | None]:
+    if re.match(r"^random\.randint\(\d+,\d+\)$", val):
+        # check if #  random.randint(0, 1000000) 0 and 100000 are integers
+        numbers = re.findall(r"\d+", val.split("(")[1])
+        if len(numbers) == 2:
+            return True, str(
+                random.randint(
+                    int(numbers[0]),
+                    int(numbers[1]),
+                )
+            )
+        else:
+            return False, None
+    else:
+        return False, None
+
+
+def format_attributes(
+    attributes: List[str] = [], seperator: str = ":"
+) -> Dict[str, str]:
+    formatted_attributes: Dict[str, str] = {}
     if attributes:
         for attr in attributes:
-            split_attr = [x.strip() for x in attr.split(":") if x.strip()]
+            valid = True
+            split_attr = [x.strip() for x in attr.split(seperator) if x.strip()]
             if len(split_attr) == 2:
-                formatted_attributes.append(split_attr)
+                val = split_attr[1]
+                # regex to check if for string random.randint(0,1000000)
+                is_valid, val = check_random_int_format(val)
+                if is_valid:
+                    split_attr[1] = val
+                    formatted_attributes[split_attr[0]] = split_attr[1]
+                else:
+                    valid = False
             else:
-                typer.echo(f"Invalid attribute: {attr}")
+                valid = False
+            if valid:
+                formatted_attributes[split_attr[0]] = split_attr[1]
+            else:
+                invalid_attribute_format(attr)
 
     return formatted_attributes

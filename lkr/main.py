@@ -172,7 +172,7 @@ def load_test(
     class DashboardUserClass(DashboardUser):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.attributes = format_attributes(attribute)
+            self.attributes = attribute
             self.dashboard = dashboard
             self.models = model
 

@@ -7,7 +7,12 @@ from looker_sdk import models40
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
-from lkr.load_test.utils import MAX_SESSION_LENGTH, PERMISSIONS, get_user_id
+from lkr.load_test.utils import (
+    MAX_SESSION_LENGTH,
+    PERMISSIONS,
+    format_attributes,
+    get_user_id,
+)
 
 __all__ = ["DashboardUser"]
 
@@ -23,7 +28,7 @@ class DashboardUser(User):
         super().__init__(*args, **kwargs)
         self.sdk = None
         self.user_id = get_user_id()
-        self.attributes: List[List[str]] = []
+        self.attributes: List[str] = []
         self.dashboard: str = ""
         self.models: List[str] = []
         chrome_options = Options()
@@ -34,6 +39,8 @@ class DashboardUser(User):
     def on_start(self):
         # Initialize the SDK - make sure to set your environment variables
         self.sdk = looker_sdk.init40()
+        attributes = format_attributes(self.attributes)
+
         sso_url = self.sdk.create_sso_embed_url(
             models40.EmbedSsoParams(
                 external_user_id=self.user_id,
@@ -41,7 +48,7 @@ class DashboardUser(User):
                 target_url=f"{os.environ.get('LOOKERSDK_BASE_URL')}/embed/dashboards/{self.dashboard}",
                 permissions=PERMISSIONS,
                 models=self.models,
-                user_attributes={attr[0]: attr[1] for attr in self.attributes},
+                user_attributes=attributes,
             )
         )
 
