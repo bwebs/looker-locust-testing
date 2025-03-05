@@ -231,13 +231,15 @@ def load_test_query(
             max=100,
         ),
     ] = 15,
-    result_format: Annotated[
-        str,
-        typer.Option(help="Result format to use for the query"),
-    ] = "json_bi",
     query_async: Annotated[
         bool, typer.Option(help="Run the query asynchronously")
     ] = False,
+    async_bail_out: Annotated[
+        int,
+        typer.Option(
+            help="How many iterations to wait for the async query to complete (roughly number of seconds)"
+        ),
+    ] = 120,
 ):
     if not query:
         raise typer.BadParameter("At least one --query must be provided")
@@ -253,8 +255,9 @@ def load_test_query(
             self.attributes = attribute
             self.qid = query
             self.models = model
-            self.result_format = result_format
+            self.result_format = "json_bi"
             self.query_async = query_async
+            self.async_bail_out = async_bail_out
 
     from locust import events
     from locust.env import Environment

@@ -1,5 +1,6 @@
 import os
 import random
+import time
 from typing import Dict, List
 
 import looker_sdk
@@ -42,6 +43,7 @@ class QueryUser(User):
         self.result_format: str = "json_bi"
         self.query_async: bool = False
         self.attributes: List[str] = []
+        self.async_bail_out: int = 120
 
     def on_start(self):
         # Initialize the SDK - make sure to set your environment variables
@@ -76,17 +78,25 @@ class QueryUser(User):
                 self.queries[query] = x
             except Exception as e:
                 print(e)
-            # if self.query_async:
-            #     task = self.sdk.create_query_task(
-            #         models40.WriteCreateQueryTask(
-            #             query_id=self.query.id,
-            #             result_format=self.result_format,
-            #             cache=False,
-            #             limit=random.randint(1, 5000),
-            #         )
-            #     )
-            #     self.sdk.task
-            # else:
-        self.sdk.run_query(
-            self.queries[query].id, result_format=self.result_format, cache=False
-        )
+        if self.query_async:
+            task = self.sdk.create_query_task(
+                models40.WriteCreateQueryTask(
+                    query_id=self.queries[query].id,
+                    result_format=self.result_format,
+                ),
+                cache=False,
+            )
+            for _i in range(self.async_bail_out):
+                check_task = self.sdk.query_task_results(task.id)
+                print(check_task)
+                if "rows" in check_task:
+                    break
+                elif "errors" in check_task:
+                    raise Exception(check_task["errors"])
+                else:
+                    time.sleep(1)
+
+        else:
+            self.sdk.run_query(
+                self.queries[query].id, result_format=self.result_format, cache=False
+            )
