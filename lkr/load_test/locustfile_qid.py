@@ -1,14 +1,27 @@
 import os
 import random
-from typing import List
+from typing import Dict, List
 
 import looker_sdk
+import requests
 from locust import User, between, task  # noqa
 from looker_sdk import models40
+from looker_sdk.sdk.api40.methods import Looker40SDK
 
-from lkr.load_test.utils import MAX_SESSION_LENGTH, PERMISSIONS, get_user_id
+from lkr.load_test.utils import (
+    MAX_SESSION_LENGTH,
+    PERMISSIONS,
+    format_attributes,
+    get_user_id,
+)
 
 __all__ = ["QueryUser"]
+
+
+def authenticate(sdk: Looker40SDK, user_id: str):
+    sdk.auth.login_user(user_id, associative=False)
+    token = sdk.auth._get_token(transport_options={"timeout": 60 * 5}).access_token
+    sdk.auth.token.set_token(token)
 
 
 class QueryUser(User):
@@ -20,38 +33,60 @@ class QueryUser(User):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.sdk = None
+        self.sdk: Looker40SDK | None = None
         self.user_id = get_user_id()
         self.attributes: List[List[str]] = []
-        self.qid: str = ""
+        self.qid: List[str] = []
         self.models: List[str] = []
+        self.queries: Dict[str, models40.Query] = {}
+        self.result_format: str = "json_bi"
+        self.query_async: bool = False
+        self.attributes: List[str] = []
 
     def on_start(self):
         # Initialize the SDK - make sure to set your environment variables
         self.sdk = looker_sdk.init40()
-        new_user = self.sdk.create_embed_user(
-            models40.CreateEmbedUserRequest(
-                external_user_id=self.user_id,
-            )
-        )
-        self.sdk.acquire_embed_cookieless_session(
-            models40.EmbedCookielessSessionAcquire(
+        attributes = format_attributes(self.attributes)
+        sso_url = self.sdk.create_sso_embed_url(
+            models40.EmbedSsoParams(
+                first_name="Embed",
+                last_name=self.user_id,
                 external_user_id=self.user_id,
                 session_length=MAX_SESSION_LENGTH,  # max seconds
-                user_attributes={attr[0]: attr[1] for attr in self.attributes},
-                models=self.models,
+                target_url=f"{os.environ.get('LOOKERSDK_BASE_URL')}/browse",
                 permissions=PERMISSIONS,
+                models=self.models,
+                user_attributes=attributes,
             )
         )
-        token = self.sdk.login_user(new_user.id, associative=True)
-        self.sdk.auth.sudo_token.set_token(token)
+        # create the embed user with the credentials by hitting the URL
+        _open_url = requests.get(sso_url.url)
+        new_user = self.sdk.user_for_credential("embed", self.user_id)
+        if not (new_user and new_user.id):
+            raise Exception("Failed to create embed user")
 
-    def on_stop(self):
-        self.driver.quit()
+        self.sdk.auth._sudo_id = new_user.id
 
     @task
     def run_query(self):
-        q = self.sdk.query(self.qid)
+        query = random.choice(self.qid)
+        if query not in self.queries:
+            try:
+                x = self.sdk.query_for_slug(query)
+                self.queries[query] = x
+            except Exception as e:
+                print(e)
+            # if self.query_async:
+            #     task = self.sdk.create_query_task(
+            #         models40.WriteCreateQueryTask(
+            #             query_id=self.query.id,
+            #             result_format=self.result_format,
+            #             cache=False,
+            #             limit=random.randint(1, 5000),
+            #         )
+            #     )
+            #     self.sdk.task
+            # else:
         self.sdk.run_query(
-            q.id, result_format="csv", cache=False, limit=random.randint(1, 5000)
+            self.queries[query].id, result_format=self.result_format, cache=False
         )
