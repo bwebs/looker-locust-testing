@@ -9,6 +9,7 @@ dependencies = [
     "looker-sdk>=25.2.0",
     "python-dotenv>=1.0.1",
     "selenium>=4.28.1",
+    "structlog>=25.2.0",
     "typer>=0.15.1",
 ]
 

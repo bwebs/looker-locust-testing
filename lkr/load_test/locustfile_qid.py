@@ -1,6 +1,8 @@
+import datetime
 import os
 import random
 import time
+from dataclasses import dataclass
 from typing import Dict, List
 
 import looker_sdk
@@ -8,6 +10,7 @@ import requests
 from locust import User, between, task  # noqa
 from looker_sdk import models40
 from looker_sdk.sdk.api40.methods import Looker40SDK
+from structlog import get_logger
 
 from lkr.load_test.utils import (
     MAX_SESSION_LENGTH,
@@ -15,6 +18,48 @@ from lkr.load_test.utils import (
     format_attributes,
     get_user_id,
 )
+
+logger = get_logger(__name__)
+
+
+@dataclass
+class TimingStats:
+    start: datetime.datetime | None = None
+    init_sdk: datetime.datetime | None = None
+    lookup_query: datetime.datetime | None = None
+    query: datetime.datetime | None = None
+    task: datetime.datetime | None = None
+    finish_task: datetime.datetime | None = None
+    run_query: datetime.datetime | None = None
+    end: datetime.datetime | None = None
+
+    def log_steps(self) -> Dict[str, float]:
+        out = {}
+        if self.init_sdk:
+            out["init_sdk"] = (self.init_sdk - self.start).total_seconds()
+        if self.lookup_query:
+            out["lookup_query"] = (
+                self.lookup_query - (self.init_sdk or self.start)
+            ).total_seconds()
+        if self.task:
+            out["task"] = (
+                self.task - (self.lookup_query or self.init_sdk or self.start)
+            ).total_seconds()
+        if self.finish_task:
+            out["finish_task"] = (self.finish_task - self.task).total_seconds()
+        if self.run_query:
+            out["run_query"] = (
+                self.run_query
+                - (
+                    self.finish_task
+                    or self.task
+                    or self.lookup_query
+                    or self.init_sdk
+                    or self.start
+                )
+            ).total_seconds()
+        return out
+
 
 __all__ = ["QueryUser"]
 
@@ -44,12 +89,12 @@ class QueryUser(User):
         self.query_async: bool = False
         self.attributes: List[str] = []
         self.async_bail_out: int = 120
+        self.sticky_sessions: bool = False
 
-    def on_start(self):
-        # Initialize the SDK - make sure to set your environment variables
-        self.sdk = looker_sdk.init40()
+    def _init_sdk(self):
+        sdk = looker_sdk.init40()
         attributes = format_attributes(self.attributes)
-        sso_url = self.sdk.create_sso_embed_url(
+        sso_url = sdk.create_sso_embed_url(
             models40.EmbedSsoParams(
                 first_name="Embed",
                 last_name=self.user_id,
@@ -63,40 +108,62 @@ class QueryUser(User):
         )
         # create the embed user with the credentials by hitting the URL
         _open_url = requests.get(sso_url.url)
-        new_user = self.sdk.user_for_credential("embed", self.user_id)
+        new_user = sdk.user_for_credential("embed", self.user_id)
         if not (new_user and new_user.id):
             raise Exception("Failed to create embed user")
 
-        self.sdk.auth._sudo_id = new_user.id
+        sdk.auth._sudo_id = new_user.id
+        return sdk
+
+    def on_start(self):
+        # Initialize the SDK - make sure to set your environment variables
+        if self.sticky_sessions:
+            self.sdk = self._init_sdk()
 
     @task
     def run_query(self):
+        ts: TimingStats = TimingStats()
+        ts.start = datetime.datetime.now()
+        if not self.sdk:
+            sdk = self._init_sdk()
+            ts.init_sdk = datetime.datetime.now()
+        else:
+            sdk = self.sdk
         query = random.choice(self.qid)
-        if query not in self.queries:
-            try:
-                x = self.sdk.query_for_slug(query)
-                self.queries[query] = x
-            except Exception as e:
-                print(e)
+
         if self.query_async:
-            task = self.sdk.create_query_task(
+            if query not in self.queries:
+                try:
+                    x = sdk.query_for_slug(query)
+                    self.queries[query] = x
+                    ts.lookup_query = datetime.datetime.now()
+                except Exception as e:
+                    print(e)
+
+            task = sdk.create_query_task(
                 models40.WriteCreateQueryTask(
                     query_id=self.queries[query].id,
                     result_format=self.result_format,
                 ),
                 cache=False,
             )
+            ts.task = datetime.datetime.now()
             for _i in range(self.async_bail_out):
-                check_task = self.sdk.query_task_results(task.id)
-                print(check_task)
-                if "rows" in check_task:
+                finish_task = sdk.query_task_results(task.id)
+                if "rows" in finish_task:
                     break
-                elif "errors" in check_task:
-                    raise Exception(check_task["errors"])
+                elif "errors" in finish_task:
+                    raise Exception(finish_task["errors"])
                 else:
                     time.sleep(1)
+            ts.finish_task = datetime.datetime.now()
 
         else:
-            self.sdk.run_query(
-                self.queries[query].id, result_format=self.result_format, cache=False
-            )
+            sdk.run_query(query, result_format=self.result_format, cache=False)
+            ts.run_query = datetime.datetime.now()
+        ts.end = datetime.datetime.now()
+        logger.info(
+            "run_query",
+            time_taken=(ts.end - ts.start).total_seconds(),
+            steps=ts.log_steps(),
+        )

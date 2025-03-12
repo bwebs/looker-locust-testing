@@ -231,6 +231,12 @@ def load_test_query(
             max=100,
         ),
     ] = 15,
+    sticky_sessions: Annotated[
+        bool,
+        typer.Option(
+            help="Keep the same user logged in for the duration of the test. sticky_sessions=True is currently not supported with the Looker SDKs, we are working around it in the User class."
+        ),
+    ] = False,
     query_async: Annotated[
         bool, typer.Option(help="Run the query asynchronously")
     ] = False,
@@ -258,6 +264,7 @@ def load_test_query(
             self.result_format = "json_bi"
             self.query_async = query_async
             self.async_bail_out = async_bail_out
+            self.sticky_sessions = sticky_sessions
 
     from locust import events
     from locust.env import Environment
