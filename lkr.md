@@ -21,7 +21,7 @@ $ lkr [OPTIONS] COMMAND [ARGS]...
 * `hello`: Say hello, world!
 * `debug`: Check that the environment variables are...
 * `load-test`
-* `test-qid`
+* `load-test:query`
 
 ## `lkr hello`
 
@@ -67,28 +67,32 @@ $ lkr load-test [OPTIONS]
 **Options**:
 
 * `--users INTEGER RANGE`: Number of users to run the test with  [default: 25; 1&lt;=x&lt;=1000]
-* `--spawn-rate FLOAT RANGE`: Number of users to spawn per second  [default: 1; 1&lt;=x&lt;=100]
+* `--spawn-rate FLOAT RANGE`: Number of users to spawn per second  [default: 1; 0&lt;=x&lt;=100]
 * `--run-time INTEGER RANGE`: How many minutes to run the load test for  [default: 5; x&gt;=1]
 * `--dashboard TEXT`: Dashboard ID to run the test on. Keeps dashboard open for user, turn on auto-refresh to keep dashboard updated
-* `--qid TEXT`: Query ID (from explore url) to run the test on
 * `--model TEXT`: Model to run the test on. Specify multiple models as --model model1 --model model2
-* `--attribute TEXT`: Looker attributes to run the test on. Specify them as attribute:value like --attribute store:value. Excepts multiple arguments --attribute store:acme --attribute team:managers
+* `--attribute TEXT`: Looker attributes to run the test on. Specify them as attribute:value like --attribute store:value. Excepts multiple arguments --attribute store:acme --attribute team:managers. Accepts random.randint(0,1000) format
 * `--help`: Show this message and exit.
 
-## `lkr test-qid`
+## `lkr load-test:query`
 
 **Usage**:
 
 ```console
-$ lkr test-qid [OPTIONS] USER_ID QID
+$ lkr load-test:query [OPTIONS]
 ```
-
-**Arguments**:
-
-* `USER_ID`: User ID to run the test on  [required]
-* `QID`: Query ID (from explore url) to run the test on  [required]
 
 **Options**:
 
+* `--query TEXT`: Query ID (from explore url) to run the test on  [required]
+* `--users INTEGER RANGE`: Number of users to run the test with  [default: 25; 1&lt;=x&lt;=1000]
+* `--spawn-rate FLOAT RANGE`: Number of users to spawn per second  [default: 1; 0&lt;=x&lt;=100]
+* `--run-time INTEGER RANGE`: How many minutes to run the load test for  [default: 5; x&gt;=1]
+* `--model TEXT`: Model to run the test on. Specify multiple models as --model model1 --model model2
+* `--attribute TEXT`: Looker attributes to run the test on. Specify them as attribute:value like --attribute store:value. Excepts multiple arguments --attribute store:acme --attribute team:managers. Accepts random.randint(0,1000) format
+* `--wait-time-min INTEGER RANGE`: User tasks have a random wait time between this and the max wait time  [default: 1; 1&lt;=x&lt;=100]
+* `--wait-time-max INTEGER RANGE`: User tasks have a random wait time between this and the min wait time  [default: 15; 1&lt;=x&lt;=100]
+* `--sticky-sessions / --no-sticky-sessions`: Keep the same user logged in for the duration of the test. sticky_sessions=True is currently not supported with the Looker SDKs, we are working around it in the User class.  [default: no-sticky-sessions]
+* `--query-async / --no-query-async`: Run the query asynchronously  [default: no-query-async]
+* `--async-bail-out INTEGER`: How many iterations to wait for the async query to complete (roughly number of seconds)  [default: 120]
 * `--help`: Show this message and exit.
-
