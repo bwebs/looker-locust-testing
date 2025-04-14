@@ -19,3 +19,9 @@ Docker
 ```
 docker run --pull=always gcr.io/looker-load-tests/lkr-test:latest lkr load-test --dashboard=1 --users=5 --run-time=1
 ```
+
+Docs
+
+```
+typer lkr/main.py utils docs --output lkr.md
+```
