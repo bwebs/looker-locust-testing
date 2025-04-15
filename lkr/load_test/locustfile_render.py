@@ -65,6 +65,7 @@ class RenderUser(User):
             result_format=self.result_format,
             width=1920,
             height=1080,
+            body=models40.CreateDashboardRenderTask(),
         )
 
         # Poll for completion

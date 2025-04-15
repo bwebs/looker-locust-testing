@@ -270,6 +270,8 @@ def load_test_query(
     runner = env.create_local_runner()
 
     # gevent.spawn(stats_printer(env.stats))
+    runner.start(user_count=users, spawn_rate=spawn_rate)
+
     def quit_runner():
         runner.greenlet.kill()
         runner.quit()
@@ -277,8 +279,6 @@ def load_test_query(
 
     runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
     runner.greenlet.join()
-
-    runner.start(user_count=users, spawn_rate=spawn_rate)
 
 
 @app.command(name="load-test:render")
@@ -351,6 +351,8 @@ def load_test_render(
     )
     runner = env.create_local_runner()
 
+    runner.start(user_count=users, spawn_rate=spawn_rate)
+
     def quit_runner():
         runner.greenlet.kill()
         runner.quit()
@@ -358,8 +360,6 @@ def load_test_render(
 
     runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
     runner.greenlet.join()
-
-    runner.start(user_count=users, spawn_rate=spawn_rate)
 
 
 if __name__ == "__main__":
