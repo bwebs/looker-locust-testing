@@ -10,6 +10,7 @@ import typer
 from dotenv import load_dotenv
 
 from lkr.load_test.locustfile_dashboard import DashboardUser
+from lkr.load_test.locustfile_render import RenderUser
 from lkr.utils.validate_api import validate_api_credentials
 
 from lkr.load_test.locustfile_qid import QueryUser
@@ -24,6 +25,7 @@ LOAD_TEST_PATH = pathlib.Path("lkr", "load_test")
 class LoadTestType(str, Enum):
     dashboard = "dashboard"
     query = "query"
+    render = "render"
 
 
 class DebugType(str, Enum):
@@ -68,14 +70,6 @@ def main(
         validate_api_credentials(
             client_id=client_id, client_secret=client_secret, base_url=base_url
         )
-
-
-@app.command()
-def hello(hidden=True):
-    """
-    Say hello, world!
-    """
-    print("Hello, World!")
 
 
 @app.command()
@@ -276,6 +270,8 @@ def load_test_query(
     runner = env.create_local_runner()
 
     # gevent.spawn(stats_printer(env.stats))
+    runner.start(user_count=users, spawn_rate=spawn_rate)
+
     def quit_runner():
         runner.greenlet.kill()
         runner.quit()
@@ -284,7 +280,86 @@ def load_test_query(
     runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
     runner.greenlet.join()
 
+
+@app.command(name="load-test:render")
+def load_test_render(
+    dashboard: Annotated[
+        str,
+        typer.Option(
+            help="Dashboard ID to render",
+        ),
+    ],
+    users: Annotated[
+        int, typer.Option(help="Number of users to run the test with", min=1, max=1000)
+    ] = 25,
+    spawn_rate: Annotated[
+        float,
+        typer.Option(help="Number of users to spawn per second", min=0, max=100),
+    ] = 1,
+    run_time: Annotated[
+        int,
+        typer.Option(help="How many minutes to run the load test for", min=1),
+    ] = 5,
+    model: Annotated[
+        List[str],
+        typer.Option(
+            help="Model to run the test on. Specify multiple models as --model model1 --model model2"
+        ),
+    ] = None,
+    attribute: Annotated[
+        List[str],
+        typer.Option(
+            help="Looker attributes to run the test on. Specify them as attribute:value like --attribute store:value. Excepts multiple arguments --attribute store:acme --attribute team:managers. Accepts random.randint(0,1000) format"
+        ),
+    ] = [],
+    result_format: Annotated[
+        str,
+        typer.Option(
+            help="Format of the rendered output (pdf, png, jpg)",
+        ),
+    ] = "pdf",
+    render_bail_out: Annotated[
+        int,
+        typer.Option(
+            help="How many iterations to wait for the render task to complete (roughly number of seconds)"
+        ),
+    ] = 120,
+):
+    if not dashboard:
+        raise typer.BadParameter("--dashboard must be provided")
+    if not model:
+        raise typer.BadParameter("At least one --model must be provided")
+    from locust import between
+
+    class RenderUserClass(RenderUser):
+        wait_time = between(1, 15)
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.attributes = attribute
+            self.dashboard = dashboard
+            self.models = model
+            self.result_format = result_format
+            self.render_bail_out = render_bail_out
+
+    from locust import events
+    from locust.env import Environment
+
+    env = Environment(
+        user_classes=[RenderUserClass],
+        events=events,
+    )
+    runner = env.create_local_runner()
+
     runner.start(user_count=users, spawn_rate=spawn_rate)
+
+    def quit_runner():
+        runner.greenlet.kill()
+        runner.quit()
+        typer.Exit(1)
+
+    runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
+    runner.greenlet.join()
 
 
 if __name__ == "__main__":

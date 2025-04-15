@@ -18,25 +18,10 @@ $ lkr [OPTIONS] COMMAND [ARGS]...
 
 **Commands**:
 
-* `hello`: Say hello, world!
 * `debug`: Check that the environment variables are...
 * `load-test`
 * `load-test:query`
-
-## `lkr hello`
-
-Say hello, world!
-
-**Usage**:
-
-```console
-$ lkr hello [OPTIONS]
-```
-
-**Options**:
-
-* `--hidden TEXT`: [default: True]
-* `--help`: Show this message and exit.
+* `load-test:render`
 
 ## `lkr debug`
 
@@ -95,4 +80,24 @@ $ lkr load-test:query [OPTIONS]
 * `--sticky-sessions / --no-sticky-sessions`: Keep the same user logged in for the duration of the test. sticky_sessions=True is currently not supported with the Looker SDKs, we are working around it in the User class.  [default: no-sticky-sessions]
 * `--query-async / --no-query-async`: Run the query asynchronously  [default: no-query-async]
 * `--async-bail-out INTEGER`: How many iterations to wait for the async query to complete (roughly number of seconds)  [default: 120]
+* `--help`: Show this message and exit.
+
+## `lkr load-test:render`
+
+**Usage**:
+
+```console
+$ lkr load-test:render [OPTIONS]
+```
+
+**Options**:
+
+* `--dashboard TEXT`: Dashboard ID to render  [required]
+* `--users INTEGER RANGE`: Number of users to run the test with  [default: 25; 1&lt;=x&lt;=1000]
+* `--spawn-rate FLOAT RANGE`: Number of users to spawn per second  [default: 1; 0&lt;=x&lt;=100]
+* `--run-time INTEGER RANGE`: How many minutes to run the load test for  [default: 5; x&gt;=1]
+* `--model TEXT`: Model to run the test on. Specify multiple models as --model model1 --model model2
+* `--attribute TEXT`: Looker attributes to run the test on. Specify them as attribute:value like --attribute store:value. Excepts multiple arguments --attribute store:acme --attribute team:managers. Accepts random.randint(0,1000) format
+* `--result-format TEXT`: Format of the rendered output (pdf, png, jpg)  [default: pdf]
+* `--render-bail-out INTEGER`: How many iterations to wait for the render task to complete (roughly number of seconds)  [default: 120]
 * `--help`: Show this message and exit.
