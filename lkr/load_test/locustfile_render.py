@@ -71,9 +71,9 @@ class RenderUser(User):
         # Poll for completion
         for _ in range(self.render_bail_out):
             task_status = self.sdk.render_task(render_task.id)
-            if task_status.status == "complete":
+            if task_status.status == "success":
                 break
-            elif task_status.status == "error":
+            elif task_status.status == "failure":
                 raise Exception(f"Render task failed: {task_status.error_message}")
             time.sleep(1)
 
@@ -86,6 +86,10 @@ class RenderUser(User):
         logger.info(
             "render_dashboard",
             dashboard_id=self.dashboard,
+            task_id=render_task.id,
             duration=duration,
+            task_runtime=render_task.runtime,
+            render_runtime=render_task.render_runtime,
+            query_runtime=render_task.query_runtime,
             status=task_status.status,
         )
