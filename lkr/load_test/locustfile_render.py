@@ -74,7 +74,7 @@ class RenderUser(User):
             if task_status.status == "success":
                 break
             elif task_status.status == "failure":
-                raise Exception(f"Render task failed: {task_status.error_message}")
+                raise Exception(f"Render task failed detail: {task_status.status_detail}")
             time.sleep(1)
 
         # Get the results
