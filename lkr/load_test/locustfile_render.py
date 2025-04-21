@@ -88,8 +88,8 @@ class RenderUser(User):
             dashboard_id=self.dashboard,
             task_id=render_task.id,
             duration=duration,
-            task_runtime=render_task.runtime,
-            render_runtime=render_task.render_runtime,
-            query_runtime=render_task.query_runtime,
+            task_runtime=getattr(render_task, 'runtime', None),
+            render_runtime=getattr(render_task, 'render_runtime', None),
+            query_runtime=getattr(render_task, 'query_runtime', None),
             status=task_status.status,
         )
