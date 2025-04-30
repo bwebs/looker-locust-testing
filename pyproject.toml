@@ -7,6 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "locust>=2.32.9",
     "looker-sdk>=25.2.0",
+    "pydantic>=2.11.3",
     "python-dotenv>=1.0.1",
     "selenium>=4.28.1",
     "structlog>=25.2.0",

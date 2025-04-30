@@ -10,11 +10,13 @@ import typer
 from dotenv import load_dotenv
 
 from lkr.load_test.locustfile_dashboard import DashboardUser
+from lkr.load_test.embed_dashboard_observability.main import DashboardUserObservability
 from lkr.load_test.locustfile_render import RenderUser
 from lkr.utils.validate_api import validate_api_credentials
 
 from lkr.load_test.locustfile_qid import QueryUser
-
+from locust import events
+from locust.env import Environment
 
 app = typer.Typer(name="lkr", no_args_is_help=True)
 state = {"client_id": False}
@@ -168,7 +170,7 @@ def load_test(
         events=events,
     )
     runner = env.create_local_runner()
-    # gevent.spawn(stats_printer(env.stats))
+    
     runner.start(user_count=users, spawn_rate=spawn_rate)
 
     def quit_runner():
@@ -356,6 +358,129 @@ def load_test_render(
     def quit_runner():
         runner.greenlet.kill()
         runner.quit()
+        typer.Exit(1)
+
+    runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
+    runner.greenlet.join()
+
+@app.command(name="load-test:embed-observability")
+def load_test_embed_observability(
+    dashboard: Annotated[
+        str,
+        typer.Option(
+            help="Dashboard ID to render",
+        ),
+    ],
+    users: Annotated[
+        int, typer.Option(help="Number of users to run the test with", min=1, max=1000)
+    ] = 5,
+    spawn_rate: Annotated[
+        float,
+        typer.Option(help="Number of users to spawn per second", min=0, max=100),
+    ] = 1,
+    run_time: Annotated[
+        int,
+        typer.Option(help="How many minutes to run the load test for", min=1),
+    ] = 5,
+    port: Annotated[
+        int,
+        typer.Option(
+            help="Port to run the embed server on",
+        ),
+    ] = 4000,
+    min_wait: Annotated[
+        int,
+        typer.Option(help="Minimum wait time between tasks", min=1),
+    ] = 60,
+    max_wait: Annotated[
+        int,
+        typer.Option(help="Maximum wait time between tasks", min=1),
+    ] = 120,
+    model: Annotated[
+        List[str],
+        typer.Option(
+            help="Model to run the test on. Specify multiple models as --model model1 --model model2"
+        ),
+    ] = None,
+    completion_timeout: Annotated[
+        int,
+        typer.Option(help="Timeout in seconds for the dashboard run complete event", min=1),
+    ] = 120,
+    attribute: Annotated[
+        List[str],
+        typer.Option(
+            help="Looker attributes to run the test on. Specify them as attribute:value like --attribute store:value. Excepts multiple arguments --attribute store:acme --attribute team:managers. Accepts random.randint(0,1000) format"
+        ),
+    ] = [],
+    log_event_prefix: Annotated[
+        str,
+        typer.Option(
+            help="Prefix to add to the log event",
+        ),
+    ] = "looker-embed-observability",
+    do_not_open_url: Annotated[
+        bool,
+        typer.Option(
+            help="Do not open the URL in the observability browser, useful for viewing a user's embed dashboard when running locally",
+        ),
+    ] = False
+    
+):
+    """
+    \b
+    Open dashboards with observability metrics. The metrics are collected through Looker's JavaScript events and logged with the specified prefix. This command will:
+    1. Start an embed server to host the dashboard iframe
+    2. Spawn multiple users that will:
+       - Open the dashboard in an iframe
+       - Wait for the dashboard to load
+       - Track timing metrics for:
+         - dashboard:loaded - Dashboard load time
+         - dashboard:run:start - Query start time
+         - dashboard:run:complete - Query completion time
+         - dashboard:tile:start - Individual tile start time
+         - dashboard:tile:complete - Individual tile completion time
+    3. Will also track start and end times for the whole process (looker_embed_task_start and looker_embed_task_complete)
+    4. Log all events with timing information to help analyze performance in a JSON format.  Events begin with <log_event_prefix>:*
+    5. Automatically stop after the specified run time
+    
+    \f
+    """
+    
+    import threading
+
+    from lkr.load_test.embed_dashboard_observability.embed_server import run_server
+        # Start the embed server in a separate thread
+    server_thread = threading.Thread(target=run_server, daemon=True, args=(port,log_event_prefix))
+    server_thread.start()
+
+    class EmbedDashboardUserClass(DashboardUserObservability):
+        wait_time = locust.between(min_wait, max_wait)
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, **kwargs)
+            self.attributes = attribute
+            self.dashboard = dashboard
+            self.models = model
+            self.completion_timeout = completion_timeout
+            self.embed_domain = f"http://localhost:{port}"
+            self.log_event_prefix = log_event_prefix
+            self.do_not_open_url = do_not_open_url
+            
+    env = Environment(
+        user_classes=[EmbedDashboardUserClass],
+        events=events,
+    )
+    runner = env.create_local_runner()
+
+    runner.start(user_count=users, spawn_rate=spawn_rate)
+
+
+    def quit_runner():
+        runner.greenlet.kill()
+        runner.quit()
+        server_thread.join(timeout=1)
+        if server_thread.is_alive():
+            server_thread._stop()
         typer.Exit(1)
 
     runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)

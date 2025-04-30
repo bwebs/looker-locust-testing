@@ -1,8 +1,14 @@
 import random
 import re
+from datetime import datetime, timezone
 from typing import Dict, List, Tuple
 
+import structlog
 import typer
+from pydantic import BaseModel, Field
+
+logger = structlog.get_logger()
+
 
 MAX_SESSION_LENGTH = 2592000
 
@@ -65,3 +71,31 @@ def format_attributes(
                 invalid_attribute_format(attr)
 
     return formatted_attributes
+
+
+def now():
+    return datetime.now(timezone.utc)
+
+def ms_diff(start: datetime):
+    return int((now() - start).total_seconds() * 1000)
+
+class LogEventResponse(BaseModel):
+    timestamp: datetime = Field(default_factory=now, timezone=timezone.utc)
+    event_name: str
+    event_prefix: str
+
+    def make_previous(self):
+        return dict(
+            previous_event_name=self.event_name,
+            previous_event_timestamp=self.timestamp,
+            previous_event_duration_ms=ms_diff(self.timestamp),
+        )
+
+def log_event(event_name: str, prefix: str, **kwargs):
+    if "timestamp" not in kwargs:
+        kwargs["timestamp"] = now().isoformat()
+    logger.info(
+        f"{prefix}:{event_name}",
+        **kwargs
+    )
+    return LogEventResponse(timestamp=kwargs["timestamp"], event_name=event_name, event_prefix=prefix)
