@@ -22,6 +22,7 @@ $ lkr [OPTIONS] COMMAND [ARGS]...
 * `load-test`
 * `load-test:query`
 * `load-test:render`
+* `load-test:embed-observability`: Open dashboards with observability metrics.
 
 ## `lkr debug`
 
@@ -100,4 +101,43 @@ $ lkr load-test:render [OPTIONS]
 * `--attribute TEXT`: Looker attributes to run the test on. Specify them as attribute:value like --attribute store:value. Excepts multiple arguments --attribute store:acme --attribute team:managers. Accepts random.randint(0,1000) format
 * `--result-format TEXT`: Format of the rendered output (pdf, png, jpg)  [default: pdf]
 * `--render-bail-out INTEGER`: How many iterations to wait for the render task to complete (roughly number of seconds)  [default: 120]
+* `--help`: Show this message and exit.
+
+## `lkr load-test:embed-observability`
+
+Open dashboards with observability metrics. The metrics are collected through Looker&#x27;s JavaScript events and logged with the specified prefix. This command will:
+1. Start an embed server to host the dashboard iframe
+2. Spawn multiple users that will:
+   - Open the dashboard in an iframe
+   - Wait for the dashboard to load
+   - Track timing metrics for:
+     - dashboard:loaded - Dashboard load time
+     - dashboard:run:start - Query start time
+     - dashboard:run:complete - Query completion time
+     - dashboard:tile:start - Individual tile start time
+     - dashboard:tile:complete - Individual tile completion time
+3. Will also track start and end times for the whole process (looker_embed_task_start and looker_embed_task_complete)
+4. Log all events with timing information to help analyze performance in a JSON format.  Events begin with &lt;log_event_prefix&gt;:*
+5. Automatically stop after the specified run time
+
+**Usage**:
+
+```console
+$ lkr load-test:embed-observability [OPTIONS]
+```
+
+**Options**:
+
+* `--dashboard TEXT`: Dashboard ID to render  [required]
+* `--users INTEGER RANGE`: Number of users to run the test with  [default: 5; 1&lt;=x&lt;=1000]
+* `--spawn-rate FLOAT RANGE`: Number of users to spawn per second  [default: 1; 0&lt;=x&lt;=100]
+* `--run-time INTEGER RANGE`: How many minutes to run the load test for  [default: 5; x&gt;=1]
+* `--port INTEGER`: Port to run the embed server on  [default: 4000]
+* `--min-wait INTEGER RANGE`: Minimum wait time between tasks  [default: 60; x&gt;=1]
+* `--max-wait INTEGER RANGE`: Maximum wait time between tasks  [default: 120; x&gt;=1]
+* `--model TEXT`: Model to run the test on. Specify multiple models as --model model1 --model model2
+* `--completion-timeout INTEGER RANGE`: Timeout in seconds for the dashboard run complete event  [default: 120; x&gt;=1]
+* `--attribute TEXT`: Looker attributes to run the test on. Specify them as attribute:value like --attribute store:value. Excepts multiple arguments --attribute store:acme --attribute team:managers. Accepts random.randint(0,1000) format
+* `--log-event-prefix TEXT`: Prefix to add to the log event  [default: looker-embed-observability]
+* `--do-not-open-url / --no-do-not-open-url`: Do not open the URL in the observability browser, useful for viewing a user&#x27;s embed dashboard when running locally  [default: no-do-not-open-url]
 * `--help`: Show this message and exit.
