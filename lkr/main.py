@@ -344,6 +344,8 @@ def load_test_render(
             self.result_format = result_format
             self.render_bail_out = render_bail_out
 
+    from locust import events
+    from locust.env import Environment
 
     env = Environment(
         user_classes=[RenderUserClass],
@@ -483,8 +485,6 @@ def load_test_embed_observability(
 
     runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
     runner.greenlet.join()
-
-    # Clean up the server thread
 
 
 if __name__ == "__main__":

@@ -141,3 +141,4 @@ $ lkr load-test:embed-observability [OPTIONS]
 * `--log-event-prefix TEXT`: Prefix to add to the log event  [default: looker-embed-observability]
 * `--do-not-open-url / --no-do-not-open-url`: Do not open the URL in the observability browser, useful for viewing a user&#x27;s embed dashboard when running locally  [default: no-do-not-open-url]
 * `--help`: Show this message and exit.
+
