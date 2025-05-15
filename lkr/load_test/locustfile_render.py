@@ -38,18 +38,22 @@ class RenderUser(User):
     def _init_sdk(self):
         sdk = looker_sdk.init40()
         attributes = format_attributes(self.attributes)
-        sso_url = sdk.create_sso_embed_url(
-            models40.EmbedSsoParams(
+        embed_session = sdk.acquire_embed_cookieless_session(
+            models40.EmbedCookielessSessionAcquire(
                 first_name="Embed",
                 last_name=self.user_id,
                 external_user_id=self.user_id,
-                session_length=MAX_SESSION_LENGTH,
-                target_url=f"{os.environ.get('LOOKERSDK_BASE_URL')}/browse",
                 permissions=PERMISSIONS,
                 models=self.models,
                 user_attributes=attributes,
             )
         )
+        looker_user = sdk.user_for_credential("embed",self.user_id)
+        if not (looker_user and looker_user.id):
+            raise Exception("Failed to create embed user")
+
+        sdk.auth._sudo_id = looker_user.id
+
         return sdk
 
     def on_start(self):
