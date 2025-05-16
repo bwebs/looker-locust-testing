@@ -326,6 +326,12 @@ def load_test_render(
             help="How many iterations to wait for the render task to complete (roughly number of seconds)"
         ),
     ] = 120,
+    run_once: Annotated[
+        bool,
+        typer.Option(
+            help="Make each user run its render task only once.", show_default=True
+        ),
+    ] = False,
 ):
     if not dashboard:
         raise typer.BadParameter("--dashboard must be provided")
@@ -343,6 +349,7 @@ def load_test_render(
             self.models = model
             self.result_format = result_format
             self.render_bail_out = render_bail_out
+            self.run_once = run_once  # Pass the command-line flag value
 
     from locust import events
     from locust.env import Environment

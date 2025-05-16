@@ -101,6 +101,7 @@ $ lkr load-test:render [OPTIONS]
 * `--attribute TEXT`: Looker attributes to run the test on. Specify them as attribute:value like --attribute store:value. Excepts multiple arguments --attribute store:acme --attribute team:managers. Accepts random.randint(0,1000) format
 * `--result-format TEXT`: Format of the rendered output (pdf, png, jpg)  [default: pdf]
 * `--render-bail-out INTEGER`: How many iterations to wait for the render task to complete (roughly number of seconds)  [default: 120]
+* `--run-once`: Make each user run its render task only once.  [default: false]
 * `--help`: Show this message and exit.
 
 ## `lkr load-test:embed-observability`
@@ -141,4 +142,3 @@ $ lkr load-test:embed-observability [OPTIONS]
 * `--log-event-prefix TEXT`: Prefix to add to the log event  [default: looker-embed-observability]
 * `--do-not-open-url / --no-do-not-open-url`: Do not open the URL in the observability browser, useful for viewing a user&#x27;s embed dashboard when running locally  [default: no-do-not-open-url]
 * `--help`: Show this message and exit.
-
