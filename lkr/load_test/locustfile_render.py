@@ -20,10 +20,9 @@ logger = get_logger(__name__)
 
 
 class RenderUser(User):
-    abstract = True
+    abstract = True  # This is a base class
     wait_time = between(1, 15)
     host = os.environ.get("LOOKERSDK_BASE_URL")
-    abstract = True  # This is a base class
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -33,6 +32,7 @@ class RenderUser(User):
         self.dashboard: str = ""
         self.models: List[str] = []
         self.result_format: str = "pdf"
+        self._task_executed: bool = False
         self.render_bail_out: int = 120
 
     def _init_sdk(self):
@@ -61,6 +61,12 @@ class RenderUser(User):
 
     @task
     def render_dashboard(self):
+        # Check if this user is configured to run its task only once and if it has already been executed.
+        if hasattr(self, 'run_once') and self.run_once:
+            if self._task_executed:
+                return
+            self._task_executed = True
+
         start_time = datetime.datetime.now()
 
         # Create render task
@@ -81,8 +87,11 @@ class RenderUser(User):
                 raise Exception(f"Render task failed detail: {task_status.status_detail}")
             time.sleep(1)
 
+        complete_render_task = self.sdk.render_task(render_task.id)
+
+        # TODO: optional flag to retrieve/process result
         # Get the results
-        results = self.sdk.render_task_results(render_task.id)
+        # results = self.sdk.render_task_results(render_task.id)
 
         end_time = datetime.datetime.now()
         duration = (end_time - start_time).total_seconds()
@@ -92,8 +101,8 @@ class RenderUser(User):
             dashboard_id=self.dashboard,
             task_id=render_task.id,
             duration=duration,
-            task_runtime=getattr(render_task, 'runtime', None),
-            render_runtime=getattr(render_task, 'render_runtime', None),
-            query_runtime=getattr(render_task, 'query_runtime', None),
+            task_runtime=getattr(complete_render_task, 'runtime', None),
+            task_render_runtime=getattr(complete_render_task, 'render_runtime', None),
+            task_query_runtime=getattr(complete_render_task, 'query_runtime', None),
             status=task_status.status,
         )

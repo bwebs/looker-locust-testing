@@ -11,7 +11,7 @@ Local
 ```
 lkr load-test:query --query=BLYyJ70e7HCeBQJrxXanHi --users=1 --run-time=5 --model=az_load_test --attribute "store:random.randint(1,7000)" --query-async
 lkr load-test --dashboard=1 --users=5 --run-time=1 --attribute store:random.randint(1,7000) --model=az_load_test
-lkr load-test:render --dashboard=1 --users=5 --run-time=1 --model=az_load_test --run-time=1
+lkr load-test:render --dashboard=1 --users=5 --run-time=1 --model=az_load_test
 
 uv run --env-file=.env lkr debug looker
 
