@@ -75,10 +75,10 @@ class RenderUser(User):
             result_format=self.result_format,
             width=1920,
             height=1080,
-            body=models40.CreateDashboardRenderTask(dashboard_style='tiled'),
+            body=models40.CreateDashboardRenderTask(dashboard_style="tiled",dashboard_filters=""),
             pdf_paper_size="a4",
             pdf_landscape=False,
-            long_tables=True
+            long_tables=True,
         )
 
         # Poll for completion
