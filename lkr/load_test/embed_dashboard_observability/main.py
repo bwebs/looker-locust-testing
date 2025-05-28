@@ -1,13 +1,14 @@
 import os
 import urllib.parse
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 from uuid import uuid4
 
 import looker_sdk
 import structlog
 from locust import User, between, task  # noqa
 from looker_sdk import models40
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
@@ -20,12 +21,76 @@ from lkr.load_test.utils import (
     PERMISSIONS,
     format_attributes,
     get_user_id,
-    log_event,
     ms_diff,
     now,
 )
 
-logger = structlog.get_logger()
+
+class EventLog(BaseModel):
+    event: str
+    user_id: str
+    dashboard: str
+    task_id: str
+    task_start_time: datetime
+    timestamp: datetime = Field(default_factory=now)
+    last_event_time: Optional[datetime] = Field(default=None)
+    last_event_name: Optional[str] = Field(default=None)
+    model_config = ConfigDict(extra="allow")
+    error: Optional[str] = Field(default=None)
+
+    @computed_field(return_type=int)
+    @property
+    def time_since_start_ms(self):
+        return ms_diff(self.task_start_time, self.timestamp)
+
+    @computed_field(return_type=int)
+    @property
+    def time_since_last_event_ms(self):
+        if not self.last_event_time:
+            return None
+        return ms_diff(self.last_event_time, self.timestamp)
+
+
+class EventLogger(BaseModel):
+    log_event_prefix: str
+    user_id: str
+    dashboard: str
+    task_id: str
+    task_start_time: datetime = Field(default_factory=now)
+    events: List[EventLog] = []
+
+    @classmethod
+    def initialize(
+        cls, user_id: str, dashboard: str, task_id: str, log_event_prefix: str
+    ):
+        return cls(
+            user_id=user_id,
+            dashboard=dashboard,
+            task_id=task_id,
+            log_event_prefix=log_event_prefix,
+        )
+
+    def log_event(self, event: str, **kwargs):
+        e = EventLog(
+            event=f"{self.log_event_prefix}:{event}",
+            user_id=self.user_id,
+            dashboard=self.dashboard,
+            task_id=self.task_id,
+            task_start_time=self.task_start_time,
+            **kwargs,
+        )
+        last_event = self.events[-1] if self.events else None
+        if last_event:
+            e.last_event_time = last_event.timestamp
+            e.last_event_name = last_event.event
+        self.events.append(e)
+        if e.error:
+            logger.error(e.event, **e.model_dump(mode="json", exclude={"event"}))
+        else:
+            logger.info(e.event, **e.model_dump(mode="json", exclude={"event"}))
+
+
+logger = structlog.get_logger(name="looker-embed-observability")
 
 __all__ = ["DashboardUserObservability"]
 
@@ -49,7 +114,8 @@ class DashboardUserObservability(User):
 
     def get_sso_url(self):
         attributes = format_attributes(self.attributes)
-
+        if not self.sdk:
+            raise ValueError("SDK not initialized")
         sso_url = self.sdk.create_sso_embed_url(
             models40.EmbedSsoParams(
                 first_name="Embed",
@@ -75,58 +141,37 @@ class DashboardUserObservability(User):
     @task
     def open_embed_dashboard(self):
         task_id = str(uuid4())
-        task_start_time = now()
-        common_log_kwargs = {
-            "user_id": self.user_id,
-            "dashboard": self.dashboard,
-            "task_start_time": task_start_time.isoformat(),
-            "task_id": task_id,
-        }
-        log_event(
-            "user_task_start",
-            self.log_event_prefix,
-            duration_ms=ms_diff(task_start_time),
-            **common_log_kwargs,
+        self.event_logger = EventLogger.initialize(
+            user_id=self.user_id,
+            dashboard=self.dashboard,
+            task_id=task_id,
+            log_event_prefix=self.log_event_prefix,
         )
+
+        self.event_logger.log_event("user_task_start")
+
         chrome_options = Options()
         chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--no-sandbox")
         driver = webdriver.Chrome(options=chrome_options)
-        driver_loaded_time = log_event(
-            "user_task_chromium_driver_loaded",
-            self.log_event_prefix,
-            duration_ms=ms_diff(task_start_time),
-            **common_log_kwargs,
-        )
+
+        self.event_logger.log_event("user_task_chromium_driver_loaded")
+
         sso_url = self.get_sso_url()
-        sso_url_generated_time = log_event(
-            "user_task_sso_url_generated",
-            self.log_event_prefix,
-            duration_ms=ms_diff(task_start_time),
-            **common_log_kwargs,
-            **driver_loaded_time.make_previous(),
-        )
-        quoted_url = urllib.parse.quote(sso_url.url, safe="")
+
+        self.event_logger.log_event("user_task_sso_url_generated")
+        quoted_url = urllib.parse.quote(str(sso_url.url), safe="")
         # Open the local embed container with the SSO URL as a parameter
         embed_url = f"{self.embed_domain}/?iframe_url={quoted_url}&dashboard_id={self.dashboard}&user_id={self.user_id}&task_id={task_id}"
+
         if not self.do_not_open_url:
             driver.get(embed_url)
-        else:
-            logger.info(
-                f"{self.log_event_prefix}:looker_embed_task_not_opening_url",
-                user_id=self.user_id,
-                dashboard=self.dashboard,
-                embed_url=sso_url.url,
-                observability_url=embed_url,
+            self.event_logger.log_event(
+                "user_task_embed_chromium_get", embed_url=embed_url
             )
-        chromium_get = log_event(
-            "user_task_embed_chromium_get",
-            self.log_event_prefix,
-            embed_url=embed_url,
-            **common_log_kwargs,
-            **sso_url_generated_time.make_previous(),
-        )
-        # Store task start time
+        else:
+            self.event_logger.log_event("looker_embed_task_not_opening_url")
+            return
 
         # Wait for the completion indicator to appear (with a timeout)
         try:
@@ -135,32 +180,16 @@ class DashboardUserObservability(User):
             )
 
             # Log completion
-            logger.info(
-                f"{self.log_event_prefix}:looker_embed_task_complete",
-                user_id=self.user_id,
-                dashboard=self.dashboard,
-                timestamp=datetime.now().isoformat(),
-                duration_ms=int(
-                    (now() - task_start_time).total_seconds() * 1000
-                ),
-                **chromium_get.make_previous(),
-            )
+            self.event_logger.log_event("looker_embed_task_complete")
 
         except TimeoutException:
-            logger.error(
-                f"{self.log_event_prefix}:looker_embed_task_timeout",
-                user_id=self.user_id,
-                dashboard=self.dashboard,
-                timestamp=now().isoformat(),
+            self.event_logger.log_event(
+                "looker_embed_task_timeout",
                 timeout=self.completion_timeout,
-                duration_ms=ms_diff(task_start_time),
+                error="Timeout waiting for completion indicator",
             )
         except Exception as e:
-            logger.error(
-                f"{self.log_event_prefix}:looker_embed_task_error",
-                user_id=self.user_id,
-                dashboard=self.dashboard,
-                error=e,
-            )
+            self.event_logger.log_event("looker_embed_task_error", error=e)
         finally:
-            driver.quit()
+            if driver:
+                driver.quit()
