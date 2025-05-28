@@ -170,7 +170,7 @@ def load_test(
         events=events,
     )
     runner = env.create_local_runner()
-    
+
     runner.start(user_count=users, spawn_rate=spawn_rate)
 
     def quit_runner():
@@ -370,6 +370,7 @@ def load_test_render(
     runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
     runner.greenlet.join()
 
+
 @app.command(name="load-test:embed-observability")
 def load_test_embed_observability(
     dashboard: Annotated[
@@ -411,7 +412,9 @@ def load_test_embed_observability(
     ] = None,
     completion_timeout: Annotated[
         int,
-        typer.Option(help="Timeout in seconds for the dashboard run complete event", min=1),
+        typer.Option(
+            help="Timeout in seconds for the dashboard run complete event", min=1
+        ),
     ] = 120,
     attribute: Annotated[
         List[str],
@@ -425,13 +428,12 @@ def load_test_embed_observability(
             help="Prefix to add to the log event",
         ),
     ] = "looker-embed-observability",
-    do_not_open_url: Annotated[
+    open_url: Annotated[
         bool,
         typer.Option(
             help="Do not open the URL in the observability browser, useful for viewing a user's embed dashboard when running locally",
         ),
-    ] = False
-    
+    ] = True,
 ):
     """
     \b
@@ -449,15 +451,18 @@ def load_test_embed_observability(
     3. Will also track start and end times for the whole process (looker_embed_task_start and looker_embed_task_complete)
     4. Log all events with timing information to help analyze performance in a JSON format.  Events begin with <log_event_prefix>:*
     5. Automatically stop after the specified run time
-    
+
     \f
     """
-    
+
     import threading
 
     from lkr.load_test.embed_dashboard_observability.embed_server import run_server
-        # Start the embed server in a separate thread
-    server_thread = threading.Thread(target=run_server, daemon=True, args=(port,log_event_prefix))
+
+    # Start the embed server in a separate thread
+    server_thread = threading.Thread(
+        target=run_server, daemon=True, args=(port, log_event_prefix)
+    )
     server_thread.start()
 
     class EmbedDashboardUserClass(DashboardUserObservability):
@@ -471,8 +476,8 @@ def load_test_embed_observability(
             self.completion_timeout = completion_timeout
             self.embed_domain = f"http://localhost:{port}"
             self.log_event_prefix = log_event_prefix
-            self.do_not_open_url = do_not_open_url
-            
+            self.do_not_open_url = not open_url
+
     env = Environment(
         user_classes=[EmbedDashboardUserClass],
         events=events,
@@ -481,18 +486,15 @@ def load_test_embed_observability(
 
     runner.start(user_count=users, spawn_rate=spawn_rate)
 
-
     def quit_runner():
         runner.greenlet.kill()
         runner.quit()
-        server_thread.join(timeout=1)
-        if server_thread.is_alive():
-            server_thread._stop()
         typer.Exit(1)
 
-    runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
+    if runner.spawning_greenlet:
+        runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
     runner.greenlet.join()
 
 
 if __name__ == "__main__":
-    typer.run(app)
+    app()
