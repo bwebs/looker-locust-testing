@@ -55,15 +55,15 @@ def main(
         ),
     ] = pathlib.Path(os.getcwd(), ".env"),
     client_id: Annotated[
-        str,
+        str | None,
         typer.Option(help="Looker API client ID"),
     ] = None,
     client_secret: Annotated[
-        str,
+        str | None,
         typer.Option(help="Looker API client secret"),
     ] = None,
     base_url: Annotated[
-        str,
+        str | None,
         typer.Option(help="Looker API base URL"),
     ] = None,
 ):
@@ -122,19 +122,19 @@ def load_test(
         typer.Option(help="How many minutes to run the load test for", min=1),
     ] = 5,
     dashboard: Annotated[
-        str,
+        str | None,
         typer.Option(
             help="Dashboard ID to run the test on. Keeps dashboard open for user, turn on auto-refresh to keep dashboard updated"
         ),
     ] = None,
     model: Annotated[
-        List[str],
+        List[str] | None,
         typer.Option(
             help="Model to run the test on. Specify multiple models as --model model1 --model model2"
         ),
     ] = None,
     attribute: Annotated[
-        List[str],
+        List[str] | None,
         typer.Option(
             help="Looker attributes to run the test on. Specify them as attribute:value like --attribute store:value. Excepts multiple arguments --attribute store:acme --attribute team:managers. Accepts random.randint(0,1000) format"
         ),
@@ -161,7 +161,7 @@ def load_test(
     class DashboardUserClass(DashboardUser):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.attributes = attribute
+            self.attributes = attribute or []
             self.dashboard = dashboard
             self.models = model
 
@@ -178,7 +178,8 @@ def load_test(
         runner.quit()
         typer.Exit(1)
 
-    runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
+    if runner.spawning_greenlet:
+        runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
     runner.greenlet.join()
 
 
@@ -200,7 +201,7 @@ def load_test_query(
         typer.Option(help="How many minutes to run the load test for", min=1),
     ] = 5,
     model: Annotated[
-        List[str],
+        List[str] | None,
         typer.Option(
             help="Model to run the test on. Specify multiple models as --model model1 --model model2"
         ),
@@ -279,7 +280,8 @@ def load_test_query(
         runner.quit()
         typer.Exit(1)
 
-    runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
+    if runner.spawning_greenlet:
+        runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
     runner.greenlet.join()
 
 
@@ -303,7 +305,7 @@ def load_test_render(
         typer.Option(help="How many minutes to run the load test for", min=1),
     ] = 5,
     model: Annotated[
-        List[str],
+        List[str] | None,
         typer.Option(
             help="Model to run the test on. Specify multiple models as --model model1 --model model2"
         ),
@@ -367,7 +369,8 @@ def load_test_render(
         runner.quit()
         typer.Exit(1)
 
-    runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
+    if runner.spawning_greenlet:
+        runner.spawning_greenlet.spawn_later(run_time * 60, quit_runner)
     runner.greenlet.join()
 
 
@@ -405,7 +408,7 @@ def load_test_embed_observability(
         typer.Option(help="Maximum wait time between tasks", min=1),
     ] = 120,
     model: Annotated[
-        List[str],
+        List[str] | None,
         typer.Option(
             help="Model to run the test on. Specify multiple models as --model model1 --model model2"
         ),
@@ -470,9 +473,9 @@ def load_test_embed_observability(
 
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
-            self.attributes = attribute
+            self.attributes = attribute or []
             self.dashboard = dashboard
-            self.models = model
+            self.models = model or []
             self.completion_timeout = completion_timeout
             self.embed_domain = f"http://localhost:{port}"
             self.log_event_prefix = log_event_prefix

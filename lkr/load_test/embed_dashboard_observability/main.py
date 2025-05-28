@@ -1,14 +1,12 @@
 import os
 import urllib.parse
-from datetime import datetime
-from typing import List, Optional
+from typing import List
 from uuid import uuid4
 
 import looker_sdk
 import structlog
 from locust import User, between, task  # noqa
 from looker_sdk import models40
-from pydantic import BaseModel, ConfigDict, Field, computed_field
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.chrome.options import Options
@@ -16,79 +14,14 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
 
+from lkr.load_test.embed_dashboard_observability.events import EventLogger
 from lkr.load_test.utils import (
     MAX_SESSION_LENGTH,
     PERMISSIONS,
     format_attributes,
     get_user_id,
-    ms_diff,
     now,
 )
-
-
-class EventLog(BaseModel):
-    event: str
-    user_id: str
-    dashboard: str
-    task_id: str
-    task_start_time: datetime
-    timestamp: datetime = Field(default_factory=now)
-    last_event_time: Optional[datetime] = Field(default=None)
-    last_event_name: Optional[str] = Field(default=None)
-    model_config = ConfigDict(extra="allow")
-    error: Optional[str] = Field(default=None)
-
-    @computed_field(return_type=int)
-    @property
-    def time_since_start_ms(self):
-        return ms_diff(self.task_start_time, self.timestamp)
-
-    @computed_field(return_type=int)
-    @property
-    def time_since_last_event_ms(self):
-        if not self.last_event_time:
-            return None
-        return ms_diff(self.last_event_time, self.timestamp)
-
-
-class EventLogger(BaseModel):
-    log_event_prefix: str
-    user_id: str
-    dashboard: str
-    task_id: str
-    task_start_time: datetime = Field(default_factory=now)
-    events: List[EventLog] = []
-
-    @classmethod
-    def initialize(
-        cls, user_id: str, dashboard: str, task_id: str, log_event_prefix: str
-    ):
-        return cls(
-            user_id=user_id,
-            dashboard=dashboard,
-            task_id=task_id,
-            log_event_prefix=log_event_prefix,
-        )
-
-    def log_event(self, event: str, **kwargs):
-        e = EventLog(
-            event=f"{self.log_event_prefix}:{event}",
-            user_id=self.user_id,
-            dashboard=self.dashboard,
-            task_id=self.task_id,
-            task_start_time=self.task_start_time,
-            **kwargs,
-        )
-        last_event = self.events[-1] if self.events else None
-        if last_event:
-            e.last_event_time = last_event.timestamp
-            e.last_event_name = last_event.event
-        self.events.append(e)
-        if e.error:
-            logger.error(e.event, **e.model_dump(mode="json", exclude={"event"}))
-        else:
-            logger.info(e.event, **e.model_dump(mode="json", exclude={"event"}))
-
 
 logger = structlog.get_logger(name="looker-embed-observability")
 
@@ -147,6 +80,7 @@ class DashboardUserObservability(User):
             task_id=task_id,
             log_event_prefix=self.log_event_prefix,
         )
+        self.task_start_time = now()
 
         self.event_logger.log_event("user_task_start")
 
@@ -162,7 +96,7 @@ class DashboardUserObservability(User):
         self.event_logger.log_event("user_task_sso_url_generated")
         quoted_url = urllib.parse.quote(str(sso_url.url), safe="")
         # Open the local embed container with the SSO URL as a parameter
-        embed_url = f"{self.embed_domain}/?iframe_url={quoted_url}&dashboard_id={self.dashboard}&user_id={self.user_id}&task_id={task_id}"
+        embed_url = f"{self.embed_domain}/?iframe_url={quoted_url}&dashboard_id={self.dashboard}&user_id={self.user_id}&task_id={task_id}&task_start_time={self.task_start_time.isoformat()}"
 
         if not self.do_not_open_url:
             driver.get(embed_url)
@@ -170,7 +104,11 @@ class DashboardUserObservability(User):
                 "user_task_embed_chromium_get", embed_url=embed_url
             )
         else:
-            self.event_logger.log_event("looker_embed_task_not_opening_url")
+            self.event_logger.log_event(
+                "looker_embed_task_not_opening_url",
+                embed_url=sso_url.url,
+                observability_url=embed_url,
+            )
             return
 
         # Wait for the completion indicator to appear (with a timeout)

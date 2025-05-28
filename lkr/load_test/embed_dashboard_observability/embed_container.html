@@ -35,6 +35,8 @@
         const dashboard = urlParams.get('dashboard_id');
         const user_id = urlParams.get('user_id');
         const task_id = urlParams.get('task_id');
+        const task_start_time = urlParams.get('task_start_time');
+        const debug = urlParams.get('debug');
         
         // Set the iframe source
         document.getElementById('looker-iframe').src = iframeUrl;
@@ -49,7 +51,7 @@
                 return;
             }
             const {type, ...data} = JSON.parse(event.data)
-            if (!trackedEvents.has(type)) {
+            if (!trackedEvents.has(type) && !debug) {
                 return;
             }
             if (type) {
@@ -58,11 +60,14 @@
                     event_type: type,
                     event_data: data,
                     timestamp: now.toISOString(),
-                    duration_ms: now.getTime() - window.taskStart.getTime(),
                     dashboard_id: dashboard,
                     user_id: user_id,
-                    task_id: task_id
+                    task_id: task_id,
+                    task_start_time: task_start_time
                 };
+                if (debug) {
+                    console.log(eventData);
+                }
                 // Send event data to the server
                 fetch('/log_event', {
                     method: 'POST',
