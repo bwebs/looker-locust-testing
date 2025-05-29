@@ -1,5 +1,4 @@
 import os
-import time
 import urllib.parse
 from typing import List
 from uuid import uuid4
@@ -92,6 +91,17 @@ class DashboardUserObservability(User):
         chrome_options.add_argument("--no-sandbox")
         chrome_options.add_argument("--disable-dev-shm-usage")
         chrome_options.add_argument("--disable-gpu")
+        chrome_options.add_argument("--enable-logging")
+        chrome_options.add_argument("--v=1")
+
+        chrome_options.add_experimental_option(
+            "prefs",
+            {
+                "profile.default_content_settings.cookies": 1,
+                "profile.cookie_controls_mode": 0,
+            },
+        )
+
         driver = webdriver.Chrome(options=chrome_options)
 
         self.event_logger.log_event("user_task_chromium_driver_loaded")
@@ -134,13 +144,6 @@ class DashboardUserObservability(User):
 
         # Wait for the completion indicator to appear (with a timeout)
         try:
-            if self.debug:
-                time.sleep(20)
-                browser_logs = driver.get_log("browser")
-                self.event_logger.log_event(
-                    "user_task_browser_logs",
-                    browser_logs=browser_logs,
-                )
             WebDriverWait(driver, self.completion_timeout).until(
                 EC.presence_of_element_located((By.ID, "completion-indicator"))
             )
@@ -158,4 +161,25 @@ class DashboardUserObservability(User):
             self.event_logger.log_event("looker_embed_task_error", error=str(e))
         finally:
             if driver:
+                if self.debug:
+                    try:
+                        console_logs = driver.get_log("browser")
+                        self.event_logger.log_event(
+                            "user_task_browser_logs",
+                            browser_logs=console_logs,
+                        )
+                    except Exception as e:
+                        self.event_logger.log_event(
+                            "user_task_browser_logs_error", error=str(e)
+                        )
+                    try:
+                        performance_logs = driver.get_log("performance")
+                        self.event_logger.log_event(
+                            "user_task_performance_logs",
+                            performance_logs=performance_logs,
+                        )
+                    except Exception as e:
+                        self.event_logger.log_event(
+                            "user_task_performance_logs_error", error=str(e)
+                        )
                 driver.quit()
