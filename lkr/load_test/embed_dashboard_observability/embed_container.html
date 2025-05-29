@@ -29,14 +29,19 @@
     <iframe id="looker-iframe" src=""></iframe>
     <script>
         // Get the iframe URL from query parameters
-        const urlParams = new URLSearchParams(window.location.search);
-        const iframeUrl = urlParams.get('iframe_url');
-        const origin = new URL(iframeUrl).origin;
-        const dashboard = urlParams.get('dashboard_id');
-        const user_id = urlParams.get('user_id');
-        const task_id = urlParams.get('task_id');
-        const task_start_time = urlParams.get('task_start_time');
-        const debug = urlParams.get('debug');
+        const url = new URL(window.location.href);
+        const iframeUrl = url.searchParams.get('iframe_url');
+        const looker_url =  new URL(iframeUrl);
+        const origin = looker_url.origin;
+        const dashboard = url.searchParams.get('dashboard_id');
+        const user_id = url.searchParams.get('user_id');
+        const task_id = url.searchParams.get('task_id');
+        const task_start_time = url.searchParams.get('task_start_time');
+        const debug = url.searchParams.get('debug') === 'true';
+        if (debug) {
+            localStorage.setItem("debug", "looker:chatty:*")
+            console.log("href", window.location.href);
+        }
         
         // Set the iframe source
         document.getElementById('looker-iframe').src = iframeUrl;
@@ -47,6 +52,9 @@
 
         // Listen for Looker embed events
         window.addEventListener('message', function(event) {
+            if (debug) {
+                console.log("event message", event.origin, event.data);
+            }
             if (event.origin !== origin) {
                 return;
             }
