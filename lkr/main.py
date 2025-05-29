@@ -18,6 +18,8 @@ from lkr.load_test.locustfile_qid import QueryUser
 from locust import events
 from locust.env import Environment
 
+import gevent
+
 app = typer.Typer(name="lkr", no_args_is_help=True)
 state = {"client_id": False}
 
@@ -437,6 +439,13 @@ def load_test_embed_observability(
             help="Do not open the URL in the observability browser, useful for viewing a user's embed dashboard when running locally",
         ),
     ] = True,
+    debug: Annotated[
+        bool,
+        typer.Option(
+            "--debug",
+            help="Enable debug mode",
+        ),
+    ] = False,
 ):
     """
     \b
@@ -458,15 +467,10 @@ def load_test_embed_observability(
     \f
     """
 
-    import threading
-
     from lkr.load_test.embed_dashboard_observability.embed_server import run_server
 
-    # Start the embed server in a separate thread
-    server_thread = threading.Thread(
-        target=run_server, daemon=True, args=(port, log_event_prefix)
-    )
-    server_thread.start()
+    # Start the embed server in a separate greenlet
+    gevent.spawn(run_server, port, log_event_prefix)
 
     class EmbedDashboardUserClass(DashboardUserObservability):
         wait_time = locust.between(min_wait, max_wait)
@@ -480,6 +484,7 @@ def load_test_embed_observability(
             self.embed_domain = f"http://localhost:{port}"
             self.log_event_prefix = log_event_prefix
             self.do_not_open_url = not open_url
+            self.debug = debug
 
     env = Environment(
         user_classes=[EmbedDashboardUserClass],

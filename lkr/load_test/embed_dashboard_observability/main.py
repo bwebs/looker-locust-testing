@@ -1,4 +1,5 @@
 import os
+import time
 import urllib.parse
 from typing import List
 from uuid import uuid4
@@ -44,6 +45,7 @@ class DashboardUserObservability(User):
         self.embed_domain = "http://localhost:3000"
         self.log_event_prefix = "looker-embed-observability"
         self.do_not_open_url = False
+        self.debug: bool = False
 
     def get_sso_url(self):
         attributes = format_attributes(self.attributes)
@@ -59,7 +61,7 @@ class DashboardUserObservability(User):
                 permissions=PERMISSIONS,
                 models=self.models,
                 user_attributes=attributes,
-                embed_domain=self.embed_domain,
+                # embed_domain=self.embed_domain,
             )
         )
         return sso_url
@@ -85,8 +87,11 @@ class DashboardUserObservability(User):
         self.event_logger.log_event("user_task_start")
 
         chrome_options = Options()
+        chrome_options.set_capability("goog:loggingPrefs", {"browser": "ALL"})
         chrome_options.add_argument("--headless=new")
         chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
+        chrome_options.add_argument("--disable-gpu")
         driver = webdriver.Chrome(options=chrome_options)
 
         self.event_logger.log_event("user_task_chromium_driver_loaded")
@@ -96,13 +101,29 @@ class DashboardUserObservability(User):
         self.event_logger.log_event("user_task_sso_url_generated")
         quoted_url = urllib.parse.quote(str(sso_url.url), safe="")
         # Open the local embed container with the SSO URL as a parameter
-        embed_url = f"{self.embed_domain}/?iframe_url={quoted_url}&dashboard_id={self.dashboard}&user_id={self.user_id}&task_id={task_id}&task_start_time={self.task_start_time.isoformat()}"
+        embed_url_params = {
+            "dashboard_id": self.dashboard,
+            "user_id": self.user_id,
+            "task_id": task_id,
+            "task_start_time": self.task_start_time.isoformat(),
+        }
+        if self.debug:
+            embed_url_params["debug"] = "true"
+
+        embed_url = f"{self.embed_domain}/?{urllib.parse.urlencode(embed_url_params)}&iframe_url={quoted_url}"
 
         if not self.do_not_open_url:
-            driver.get(embed_url)
-            self.event_logger.log_event(
-                "user_task_embed_chromium_get", embed_url=embed_url
-            )
+            try:
+                driver.get(embed_url)
+                self.event_logger.log_event(
+                    "user_task_embed_chromium_get", embed_url=embed_url
+                )
+            except Exception as e:
+                self.event_logger.log_event(
+                    "user_task_embed_chromium_get_error",
+                    embed_url=embed_url,
+                    error=str(e),
+                )
         else:
             self.event_logger.log_event(
                 "looker_embed_task_not_opening_url",
@@ -113,6 +134,13 @@ class DashboardUserObservability(User):
 
         # Wait for the completion indicator to appear (with a timeout)
         try:
+            if self.debug:
+                time.sleep(20)
+                browser_logs = driver.get_log("browser")
+                self.event_logger.log_event(
+                    "user_task_browser_logs",
+                    browser_logs=browser_logs,
+                )
             WebDriverWait(driver, self.completion_timeout).until(
                 EC.presence_of_element_located((By.ID, "completion-indicator"))
             )
@@ -127,7 +155,7 @@ class DashboardUserObservability(User):
                 error="Timeout waiting for completion indicator",
             )
         except Exception as e:
-            self.event_logger.log_event("looker_embed_task_error", error=e)
+            self.event_logger.log_event("looker_embed_task_error", error=str(e))
         finally:
             if driver:
                 driver.quit()

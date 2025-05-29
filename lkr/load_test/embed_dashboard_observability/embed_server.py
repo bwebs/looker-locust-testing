@@ -84,4 +84,4 @@ def run_server(port=3000, log_event_prefix="looker_embed_observability"):
 
 
 if __name__ == "__main__":
-    run_server(3000, log_event_prefix="looker_embed_observability")
+    run_server(4000, log_event_prefix="looker_embed_observability")
