@@ -31,6 +31,7 @@ __all__ = ["DashboardUserObservability"]
 class DashboardUserObservability(User):
     abstract = True
     wait_time = between(1000, 2000)
+    cleanup_user: bool = True
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -70,7 +71,10 @@ class DashboardUserObservability(User):
         self.sdk = looker_sdk.init40()
 
     def on_stop(self):
-        pass
+        if self.cleanup_user and self.sdk and self.user_id:
+            user = self.sdk.user_for_credential("embed", self.user_id)
+            if user and user.id:
+                self.sdk.delete_user(user.id)
 
     @task
     def open_embed_dashboard(self):
