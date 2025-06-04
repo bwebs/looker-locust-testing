@@ -23,6 +23,7 @@ class DashboardUser(User):
     # This should match your Looker instance's embed domain
     host = os.environ.get("LOOKERSDK_BASE_URL")
     abstract = True  # This is a base class
+    cleanup_user: bool = True
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -53,10 +54,16 @@ class DashboardUser(User):
                 user_attributes=attributes,
             )
         )
-
-        self.driver.get(sso_url.url)
+        if sso_url and sso_url.url:
+            self.driver.get(sso_url.url)
+        else:
+            raise Exception("Failed to get sso url")
 
     def on_stop(self):
+        if self.cleanup_user and self.sdk and self.user_id:
+            user = self.sdk.user_for_credential("embed", self.user_id, "id")
+            if user and user.id:
+                self.sdk.delete_user(user.id)
         self.driver.quit()
 
     @task

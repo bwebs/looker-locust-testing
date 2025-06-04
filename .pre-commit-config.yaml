@@ -1,0 +1,8 @@
+repos:
+  - repo: local
+    hooks:
+      - id: generate-lkr-docs
+        name: Generate lkr.md docs
+        entry: bash -c 'source .venv/bin/activate && python -m typer lkr/main.py utils docs --output lkr.md && git add lkr.md'
+        language: system
+        pass_filenames: false

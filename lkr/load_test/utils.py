@@ -1,3 +1,5 @@
+import base64
+import json
 import random
 import re
 from datetime import datetime, timezone
@@ -5,6 +7,7 @@ from typing import Dict, List, Tuple
 
 import structlog
 import typer
+from looker_sdk.sdk.api40 import models as models40
 
 logger = structlog.get_logger()
 
@@ -56,9 +59,9 @@ def format_attributes(
             if len(split_attr) == 2:
                 val = split_attr[1]
                 # regex to check if for string random.randint(0,1000000)
-                is_valid, val = check_random_int_format(val)
-                if is_valid:
-                    split_attr[1] = val
+                is_valid, new_val = check_random_int_format(val)
+                if is_valid and new_val is not None:
+                    split_attr[1] = new_val
                     formatted_attributes[split_attr[0]] = split_attr[1]
                 else:
                     valid = False
@@ -80,3 +83,23 @@ def ms_diff(start: datetime, end: datetime | None = None):
     if end is None:
         end = now()
     return int((end - start).total_seconds() * 1000)
+
+
+def extract_looker_user_id_from_token(
+    response: models40.EmbedCookielessSessionAcquireResponse,
+) -> int | None:
+    if not (response and response.authentication_token):
+        logger.error("No authentication token found")
+        return None
+    try:
+        payload = response.authentication_token.split(".")[1]
+        payload_bytes = base64.b64decode(payload)
+        payload_json = json.loads(payload_bytes)
+        credentials = json.loads(payload_json.get("credentials"))
+        if not credentials:
+            logger.error("No credentials found in authentication token")
+            return None
+        return int(credentials.get("user_id"))
+    except Exception as e:
+        logger.error("Failed to extract looker user id from token", error=e)
+        return None
