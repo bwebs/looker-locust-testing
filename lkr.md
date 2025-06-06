@@ -58,6 +58,7 @@ $ lkr load-test [OPTIONS]
 * `--dashboard TEXT`: Dashboard ID to run the test on. Keeps dashboard open for user, turn on auto-refresh to keep dashboard updated
 * `--model TEXT`: Model to run the test on. Specify multiple models as --model model1 --model model2
 * `--attribute TEXT`: Looker attributes to run the test on. Specify them as attribute:value like --attribute store:value. Excepts multiple arguments --attribute store:acme --attribute team:managers. Accepts random.randint(0,1000) format
+* `--stop-timeout INTEGER`: How many seconds to wait for the load test to stop  [default: 15]
 * `--help`: Show this message and exit.
 
 ## `lkr load-test:query`

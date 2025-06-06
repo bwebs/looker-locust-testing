@@ -42,4 +42,4 @@ gcloud run jobs create lkr-help-job \
     --args='load-test --dashboard=1 --users=5 --run-time=1 --model=az_load_test --run-time=1' \
     --project=your-project-id \
     --region=your-region \ 
-    --set-env-vars=LOOKERSDK_CLIENT_ID=your-client-id,LOOKERSDK_CLIENT_SECRET=your-client-secret,LOOKESDK_BASE_URL=https://your-looker-instance.com
+    --set-env-vars=LOOKERSDK_CLIENT_ID=your-client-id,LOOKERSDK_CLIENT_SECRET=your-client-secret,LOOKERSDK_BASE_URL=https://your-looker-instance.com
