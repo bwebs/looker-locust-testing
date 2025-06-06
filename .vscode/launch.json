@@ -12,6 +12,26 @@
             ],
             "console": "integratedTerminal",
             "justMyCode": true
+        },
+        {
+            "name": "lkr load-test",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}/.venv/bin/lkr",
+            "args": [
+                "--env-file=${workspaceFolder}/.env",
+                "load-test",
+                "--dashboard=1",
+                "--model=az_load_test",
+                "--users=1",
+                "--run-time=1"
+            ],
+            "console": "integratedTerminal",
+            "justMyCode": false,
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "GEVENT_SUPPORT": "True"
+            }
         }
     ]
 }

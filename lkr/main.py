@@ -141,6 +141,12 @@ def load_test(
             help="Looker attributes to run the test on. Specify them as attribute:value like --attribute store:value. Excepts multiple arguments --attribute store:acme --attribute team:managers. Accepts random.randint(0,1000) format"
         ),
     ] = None,
+    stop_timeout: Annotated[
+        int,
+        typer.Option(
+            help="How many seconds to wait for the load test to stop",
+        ),
+    ] = 15,
 ):
     from locust import events
     from locust.env import Environment
@@ -168,16 +174,16 @@ def load_test(
             self.models = model
 
     env = Environment(
-        user_classes=[DashboardUserClass],
-        events=events,
+        user_classes=[DashboardUserClass], events=events, stop_timeout=stop_timeout
     )
     runner = env.create_local_runner()
 
     runner.start(user_count=users, spawn_rate=spawn_rate)
 
     def quit_runner():
-        runner.greenlet.kill()
-        runner.quit()
+        runner.stop()
+        if runner.greenlet:
+            runner.greenlet.kill(block=False)
         typer.Exit(1)
 
     if runner.spawning_greenlet:
@@ -278,8 +284,9 @@ def load_test_query(
     runner.start(user_count=users, spawn_rate=spawn_rate)
 
     def quit_runner():
-        runner.greenlet.kill()
-        runner.quit()
+        runner.stop()
+        if runner.greenlet:
+            runner.greenlet.kill(block=False)
         typer.Exit(1)
 
     if runner.spawning_greenlet:
@@ -367,8 +374,9 @@ def load_test_render(
     runner.start(user_count=users, spawn_rate=spawn_rate)
 
     def quit_runner():
-        runner.greenlet.kill()
-        runner.quit()
+        runner.stop()
+        if runner.greenlet:
+            runner.greenlet.kill(block=False)
         typer.Exit(1)
 
     if runner.spawning_greenlet:
@@ -495,8 +503,9 @@ def load_test_embed_observability(
     runner.start(user_count=users, spawn_rate=spawn_rate)
 
     def quit_runner():
-        runner.greenlet.kill()
-        runner.quit()
+        runner.stop()
+        if runner.greenlet:
+            runner.greenlet.kill(block=False)
         typer.Exit(1)
 
     if runner.spawning_greenlet:
